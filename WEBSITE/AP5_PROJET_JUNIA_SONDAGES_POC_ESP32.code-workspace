@@ -1,0 +1,27 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "LED-TEST",
+			"path": "../TEST/LED-TEST"
+		},
+		{
+			"name": "WEBSITE",
+			"path": "."
+		},
+		{
+			"name": "serial:/COM3",
+			"uri": "serial://com3/"
+		},
+		{
+			"name": "AP5",
+			"path": "../.."
+		},
+		{
+			"path": "../TEST"
+		}
+	],
+	"settings": {}
+}
