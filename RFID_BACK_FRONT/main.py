@@ -9,7 +9,7 @@ import urequests
 from mfrc522 import MFRC522
 from AP import AP_PASSWD, AP_SSID
 from STA import STA_SSID, STA_PASSWD
-from http_utils import response, parse_request
+from http_utils import response, parse_request, pass_through
 
 RFC_TIMEOUT_S=10
 
@@ -64,28 +64,14 @@ def read_rfid(timeout=10):
             if stat == RFC522.OK and len(raw_uid) >= 4:
                 return uid_to_str(raw_uid)
         blink_led(0.05)
-        
-
-def get_auth(rfid):
-    headers = {"Content-Type": "application/json"}
-    data = ujson.dumps({"rfid": rfid})
-    try:
-        r = urequests.post("f{BACKEND_URL}/authorize", headers=headers, data=data)
-        print("Backend response:", r.status_code, r.text)
-        if r.status_code == 200:
-            return True
-        else:
-            return False
-    except Exception as e:
-        print("HTTP error:", e)
-        return False
-    finally:
-        r.close()
 
 def _handle_lobby(connection, body):
-    html = get_html_content("index.html")
+    pass_through(
+        connection, 
+        urequests.get,
+        f"{FRONTEND_URL}/index.html"
+    )
 
-    response(connection, 200, html)
 
 def _handle_auth(connection, body):
     uid_str = read_rfid(RFC_TIMEOUT_S)
@@ -94,43 +80,34 @@ def _handle_auth(connection, body):
         response_text = "TIMEOUT"
         status_code = 400
         response(connection, 408, "Délai d'authentification expiré")
-        
-    headers = {"Content-Type": "application/json"}
-    body = ujson.dumps({"rfid": uid_str})
-    try:
-        r = urequests.post(f"{BACKEND_URL}/authorize", headers=headers, data=body)
-        if 200 == r.status_code:
-            response(connection, 200, uid_str)
-        else:
-            response(connection, r.status_code, r.text)
-    except Exception as e:
-        response(connection, 500, f"Error contacting backend: {e}")
-    finally:
-        r.close()
+    
+    pass_through( 
+        connection, 
+        urequests.post, 
+        f"{BACKEND_URL}/authorize", 
+        headers={"Content-Type": "application/json"}, 
+        data=ujson.dumps({"rfid": uid_str})
+    )
 
     
 def _handle_submit(connection, body):
-    headers = {"Content-Type": "application/json"}
-    try:
-        r = urequests.post(f"{BACKEND_URL}/vote", headers=headers, data=body)
-        response(connection, r.status_code, r.text)
-    except Exception as e:
-        response(connection, 500, f"Error contacting backend: {e}")
-    finally:
-        r.close()
+    pass_through(
+        connection, 
+        urequests.post, 
+        f"{BACKEND_URL}/vote", 
+        headers={"Content-Type": "application/json"}, 
+        data=body
+    )
+    
+def _handle_stats(connection, body):
+    pass_through(
+        connection, 
+        urequests.get,
+        f"{BACKEND_URL}/projects"
+    )
 
 def _handle_404(connection, body):
     response(connection, 404)
-    
-def _handle_stats(connection, body):
-    try:
-        r = urequests.get(f"{BACKEND_URL}/projects")
-        response(connection, r.status_code, r.text)
-    except Exception as e:
-        response(connection, 500, f"Error contacting backend: {e}")
-    finally:
-        r.close()
-
         
 REQUESTS_CALLBACKS = {
     "/": _handle_lobby,
@@ -154,8 +131,10 @@ def handle_requests(socket):
         gc.collect()
         
         
-        
-BACKEND_URL = "http://20.56.20.65/backend"
+
+BASE_URL="http://20.56.20.65"   
+BACKEND_URL = f"{BASE_URL}/backend"
+FRONTEND_URL = f"{BASE_URL}/frontend"
         
 def main():
     connect_sta()
