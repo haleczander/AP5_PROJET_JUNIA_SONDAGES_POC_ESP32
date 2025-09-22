@@ -32,7 +32,7 @@ public class PocEsp32Application extends SpringBootServletInitializer {
     private List<Map<String, Object>> projects = createProjects();
 
     private List<String> authorizedRfids = List.of(
-        "39:68:B3:B9:5B"
+        "3968B3B95B"
     );
 
     private List<Map<String, Object>> createProjects() {
@@ -104,6 +104,8 @@ public class PocEsp32Application extends SpringBootServletInitializer {
         String rfid = request.get("rfid");
         Map<String, Object> response = new HashMap<>();
 
+        System.out.println("RFID reçu: " + rfid); // log console
+
         if (rfid == null || rfid.isEmpty()) {
             response.put("message", "No RFID provided");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response); // 400
@@ -117,4 +119,5 @@ public class PocEsp32Application extends SpringBootServletInitializer {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response); // 403
         }
     }
+
 }
