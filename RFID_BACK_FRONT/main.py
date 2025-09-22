@@ -47,6 +47,7 @@ def start_ap(ssid=AP_SSID, passwd=AP_PASSWD):
 
 def start_socket():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(('0.0.0.0', 80))
     s.listen(5)
     print("Server listening...")
@@ -63,6 +64,7 @@ def read_rfid(timeout=10):
             stat, raw_uid = RFC522.anticoll()
             if stat == RFC522.OK and len(raw_uid) >= 4:
                 return uid_to_str(raw_uid)
+        # time.sleep(.05)
         blink_led(0.05)
 
 def _handle_lobby(connection, body):
@@ -137,10 +139,19 @@ BACKEND_URL = f"{BASE_URL}/backend"
 FRONTEND_URL = f"{BASE_URL}/frontend"
         
 def main():
-    connect_sta()
-    start_ap()
+    sta = connect_sta()
+    ap = start_ap()
     socket = start_socket()
-    while True: handle_requests(socket)
+    while True: 
+        print("RAM libre:", gc.mem_free())
+        print("STA active:", sta.active(), "Connected:", sta.isconnected())
+        print("AP active:", ap.active())
+        try:
+            socket.fileno()  
+            print("Socket actif")
+        except Exception:
+            print("Socket fermé ou invalide")
+        handle_requests(socket)
     
 if __name__ == "__main__":
     main()
