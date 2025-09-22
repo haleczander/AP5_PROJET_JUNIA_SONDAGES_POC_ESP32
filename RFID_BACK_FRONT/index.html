@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Questionnaire</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; }
+#formContainer { display: none; margin-top: 20px; }
+#projectsList { margin-top: 20px; }
+.voteStars span { cursor: pointer; color: gray; font-size: 1.5em; }
+.voteStars .selected { color: gold; }
+button { padding: 8px 16px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Bienvenue sur le questionnaire</h1>
+
+<button id="loginBtn">Se connecter</button>
+<p id="status"></p>
+
+<h2>Votes actuels</h2>
+<ul id="projectsList"></ul>
+
+<div id="formContainer">
+    <h2>Formulaire de vote</h2>
+    <form id="voteForm"></form>
+    <button id="submitBtn">Soumettre</button>
+</div>
+
+<script>
+let uid = null;
+let projects = [];
+
+// --- Chargement des stats ---
+async function loadProjects() {
+    try {
+        const res = await fetch('/stats');
+        projects = await res.json();
+        const list = document.getElementById('projectsList');
+        list.innerHTML = "";
+        projects.forEach(proj => {
+            const li = document.createElement('li');
+            li.textContent = `${proj.projet_nom} : ${proj.nb_votes} votes`;
+            list.appendChild(li);
+        });
+    } catch(e) {
+        console.error("Erreur récupération projets :", e);
+    }
+}
+
+// --- Login RFID ---
+document.getElementById('loginBtn').onclick = async function() {
+    document.getElementById('status').innerText = "Présentez votre badge...";
+    try {
+        const res = await fetch('/auth', {method:'POST'});
+        const text = await res.text();
+        if(res.status === 200) {
+            uid = text;
+            document.getElementById('status').innerText = "Badge accepté !";
+            showForm();
+        } else {
+            document.getElementById('status').innerText = "Accès refusé : " + text;
+        }
+    } catch(e) {
+        document.getElementById('status').innerText = "Erreur de connexion : " + e;
+    }
+}
+
+// --- Affichage du formulaire de vote ---
+function showForm() {
+    const container = document.getElementById('formContainer');
+    const form = document.getElementById('voteForm');
+    form.innerHTML = "";
+    projects.forEach(proj => {
+        const div = document.createElement('div');
+        div.innerHTML = `<label>${proj.projet_nom}</label> <span class="voteStars">${"☆".repeat(5)}</span>`;
+        // Ajouter comportement étoiles
+        const stars = div.querySelector('.voteStars');
+        stars.dataset.value = 0;
+        stars.addEventListener('click', (ev)=>{
+            const rect = stars.getBoundingClientRect();
+            const x = ev.clientX - rect.left;
+            const starNum = Math.ceil(x / (rect.width / 5));
+            stars.dataset.value = starNum;
+            stars.innerHTML = "★".repeat(starNum) + "☆".repeat(5 - starNum);
+        });
+        form.appendChild(div);
+    });
+    container.style.display = "block";
+}
+
+// --- Soumission du formulaire ---
+document.getElementById('submitBtn').onclick = async function() {
+    const votes = {};
+    const divs = document.querySelectorAll('#voteForm div');
+    divs.forEach((div,i)=>{
+        const stars = div.querySelector('.voteStars');
+        votes[i+1] = parseInt(stars.dataset.value || 0);
+    });
+    try {
+        const res = await fetch('/submit', {
+            method: 'POST',
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(votes)
+        });
+        const text = await res.text();
+        // Reset token et retour lobby
+        uid = null;
+        document.getElementById('formContainer').style.display = 'none';
+        document.getElementById('status').innerText = text;
+        loadProjects();
+    } catch(e) {
+        document.getElementById('status').innerText = "Erreur soumission : " + e;
+    }
+}
+
+// --- Rafraîchissement automatique des votes ---
+loadProjects();
+setInterval(loadProjects, 5000);
+</script>
+
+</body>
+</html>

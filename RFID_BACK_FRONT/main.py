@@ -16,6 +16,11 @@ RFC_TIMEOUT_S=10
 ESP32_LED=Pin(2, Pin.OUT)
 RFC522=MFRC522(18,23,19,22,5)
 
+def get_html_content(html_file):
+    with open(html_file, 'r') as f:
+        html_content = f.read()
+    return html_content
+
 def blink_led(period):
     ESP32_LED.value(1)
     time.sleep(period/2)
@@ -52,9 +57,7 @@ def read_rfid(timeout=10):
         return "".join("{:02X}".format(x) for x in uid)
     
     t0 = time.time()
-    while True:
-        if (time.time() - t0) > timeout:
-            return None
+    while (time.time() - t0) <= timeout:
         stat, tag_type = RFC522.request(RFC522.REQIDL)
         if stat == RFC522.OK:
             stat, raw_uid = RFC522.anticoll()
@@ -76,33 +79,12 @@ def get_auth(rfid):
     except Exception as e:
         print("HTTP error:", e)
         return False
+    finally:
+        r.close()
 
 def _handle_lobby(connection, body):
-    html = """
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"><title>Lobby</title></head>
-    <body>
-        <h1>Bienvenue sur le questionnaire</h1>
-        <button onclick="login()">Se connecter</button>
-        <p id="status"></p>
-        <script>
-        function login() {
-            document.getElementById('status').innerText = "Présentez votre badge...";
-            fetch('/auth', {method:'POST'}).then(r=>r.text()).then(t=>{
-                if(t.startsWith("OK:")){
-                    let uid = t;
-                    window.localStorage.setItem('uid', uid);
-                    window.location = "/form";
-                } else {
-                    document.getElementById('status').innerText = t;
-                }
-            });
-        }
-        </script>
-    </body>
-    </html>
-    """
+    html = get_html_content("index.html")
+
     response(connection, 200, html)
 
 def _handle_auth(connection, body):
@@ -123,6 +105,8 @@ def _handle_auth(connection, body):
             response(connection, r.status_code, r.text)
     except Exception as e:
         response(connection, 500, f"Error contacting backend: {e}")
+    finally:
+        r.close()
 
     
 def _handle_submit(connection, body):
@@ -132,6 +116,8 @@ def _handle_submit(connection, body):
         response(connection, r.status_code, r.text)
     except Exception as e:
         response(connection, 500, f"Error contacting backend: {e}")
+    finally:
+        r.close()
 
 def _handle_404(connection, body):
     response(connection, 404)
@@ -142,6 +128,8 @@ def _handle_stats(connection, body):
         response(connection, r.status_code, r.text)
     except Exception as e:
         response(connection, 500, f"Error contacting backend: {e}")
+    finally:
+        r.close()
 
         
 REQUESTS_CALLBACKS = {
